@@ -160,7 +160,7 @@ Los UUIDs deben coincidir exactamente entre el ESP32 y la app:
 
 ## 👤 Autor
 
-**Boris (Boricuas)** — Técnico en electrónica marina, TMR Yacht, Cartagena, Colombia.
+**Boris (Boricuas)** — Técnico en electrónica marina, y estudiante de desarrollo de software, Cartagena, Colombia.
 
 ---
 
