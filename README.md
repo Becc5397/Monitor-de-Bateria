@@ -17,6 +17,21 @@ Monitor en tiempo real del sistema eléctrico de la TVS Apache 160 4v mediante B
 
 ---
 
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/gauges.jpeg" width="250"/>
+  <img src="docs/chart.jpeg" width="250"/>
+</p>
+
+## 🔧 Hardware
+
+<p align="center">
+  <img src="docs/hardware.jpeg" width="500"/>
+</p>
+
+---
+
 ## 🗂️ Estructura del repositorio
 
 ```
