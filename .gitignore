@@ -1,0 +1,15 @@
+cat > .gitignore << 'EOF'
+# React Native / Expo
+moto-monitor-native/node_modules/
+moto-monitor-native/.expo/
+moto-monitor-native/android/
+moto-monitor-native/ios/
+moto-monitor-native/.env
+
+# Arduino
+moto-monitor-ble/build/
+
+# Sistema
+.DS_Store
+Thumbs.db
+EOF
