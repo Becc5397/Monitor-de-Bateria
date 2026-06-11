@@ -1,18 +1,12 @@
-import { decode } from "base-64";
-import { useEffect, useRef, useState } from "react";
+// ═══════════════════════════════════════════════════════════════════════════════
+// useBLE.js — Monitor BLE usando configuración dinámica
+// ═══════════════════════════════════════════════════════════════════════════════
+
+import { useCallback, useEffect, useRef, useState } from "react";
 import { PermissionsAndroid, Platform } from "react-native";
 import { BleManager, State } from "react-native-ble-plx";
+import { decode } from "base-64";
 import { voltajePorcentaje } from "../utils/batteryPercent";
-
-const BLE_DEVICE_NAME = "MotoMonitor";
-const SERVICE_UUID = "12345678-1234-1234-1234-123456789abc";
-const CHAR_UUID = "abcd1234-ab12-ab12-ab12-abcdef123456";
-const VOLTAJE_MIN = 11.5;
-const VOLTAJE_MAX = 14.8;
-const CORRIENTE_MAX = 9.0;
-const CORRIENTE_ALTA = 7.0;
-const BATERIA_BAJA = 12.0;
-const MAX_HISTORY = 60;
 
 async function requestBLEPermissions() {
   if (Platform.OS !== "android") return true;
@@ -24,11 +18,11 @@ async function requestBLEPermissions() {
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       ]);
       return Object.values(results).every(
-        (r) => r === PermissionsAndroid.RESULTS.GRANTED,
+        (r) => r === PermissionsAndroid.RESULTS.GRANTED
       );
     }
     const result = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
     );
     return result === PermissionsAndroid.RESULTS.GRANTED;
   } catch (err) {
@@ -37,31 +31,40 @@ async function requestBLEPermissions() {
   }
 }
 
-export function useBLE() {
-  const [connected, setConnected] = useState(false);
-  const [voltage, setVoltage] = useState(null);
-  const [current, setCurrent] = useState(null);
-  const [power, setPower] = useState(null);
-  const [batteryPct, setBatteryPct] = useState(null);
-  const [history, setHistory] = useState([]);
-  const [alerts, setAlerts] = useState([]);
+const SERVICE_UUID = "12345678-1234-1234-1234-123456789abc";
+const CHAR_UUID    = "abcd1234-ab12-ab12-ab12-abcdef123456";
+const MAX_HISTORY  = 60;
 
-  const deviceRef = useRef(null);
+// ← recibe config como parámetro
+export function useBLE(config) {
+  const [connected,  setConnected]  = useState(false);
+  const [voltage,    setVoltage]    = useState(null);
+  const [current,    setCurrent]    = useState(null);
+  const [power,      setPower]      = useState(null);
+  const [batteryPct, setBatteryPct] = useState(null);
+  const [history,    setHistory]    = useState([]);
+  const [alerts,     setAlerts]     = useState([]);
+
+  const deviceRef  = useRef(null);
   const monitorRef = useRef(null);
-  const scanRef = useRef(false);
+  const scanRef    = useRef(false);
   const managerRef = useRef(new BleManager());
 
-  // ── Refs para callbacks estables ──────────────────────────────────────────
-  // Usamos refs para evitar closures stale sin necesidad de dependencias
-  const setHistoryRef = useRef(setHistory);
-  const setVoltageRef = useRef(setVoltage);
-  const setCurrentRef = useRef(setCurrent);
-  const setPowerRef = useRef(setPower);
+  // Refs para setters
+  const setHistoryRef    = useRef(setHistory);
+  const setVoltageRef    = useRef(setVoltage);
+  const setCurrentRef    = useRef(setCurrent);
+  const setPowerRef      = useRef(setPower);
   const setBatteryPctRef = useRef(setBatteryPct);
-  const setAlertsRef = useRef(setAlerts);
-  const setConnectedRef = useRef(setConnected);
+  const setAlertsRef     = useRef(setAlerts);
+  const setConnectedRef  = useRef(setConnected);
 
-  // handleData usa refs directamente — nunca tiene closure stale
+  // Config en ref para que handleData siempre tenga el valor más reciente
+  const configRef = useRef(config);
+  useEffect(() => {
+    configRef.current = config;
+  }, [config]);
+
   const handleData = useRef((char) => {
     if (!char?.value) return;
     try {
@@ -70,38 +73,43 @@ export function useBLE() {
 
       const v = parseFloat(data.v ?? data.voltage);
       const i = parseFloat(data.i ?? data.current);
-
       if (isNaN(v) || isNaN(i)) return;
 
+      // Usa config desde ref — siempre actualizado
+      const cfg = configRef.current;
+
       setVoltageRef.current(v);
-
       setCurrentRef.current(i);
-
       setPowerRef.current(parseFloat((v * i).toFixed(2)));
-
       setBatteryPctRef.current(voltajePorcentaje(v));
 
-      setAlertsRef.current([]);
+      const a = [];
+      if (v < cfg.voltajeMin)
+        a.push({ tipo: "danger",  msg: `Voltaje crítico < ${cfg.voltajeMin}V` });
+      if (v > cfg.voltajeMax)
+        a.push({ tipo: "danger",  msg: `Sobrevoltaje > ${cfg.voltajeMax}V` });
+      if (i > cfg.corrienteMax)
+        a.push({ tipo: "danger",  msg: `Sobrecorriente > ${cfg.corrienteMax}A` });
+      else if (i > cfg.corrienteAlta)
+        a.push({ tipo: "warning", msg: `Corriente alta > ${cfg.corrienteAlta}A` });
+      if (v < cfg.bateriaBaja && v >= cfg.voltajeMin)
+        a.push({ tipo: "warning", msg: `Batería baja < ${cfg.bateriaBaja}V` });
+      setAlertsRef.current(a);
 
       setHistoryRef.current((prev) => {
-        const next = [
-          ...prev,
-          { voltage: v, current: i, timestamp: Date.now() },
-        ];
+        const next = [...prev, { voltage: v, current: i, timestamp: Date.now() }];
         return next.length > MAX_HISTORY ? next.slice(-MAX_HISTORY) : next;
       });
     } catch (e) {
-      console.error("Error parseando dato BLE:", e.message);
+      console.error("Error BLE:", e.message);
     }
   }).current;
 
-  // startScan y connectDevice también usan refs para evitar dependencias
   const startScanRef = useRef(null);
 
   const connectDevice = useRef(async (device) => {
     try {
       console.log("Conectando...");
-      const manager = managerRef.current;
       const dev = await device.connect({ autoConnect: false, timeout: 15000 });
       await dev.discoverAllServicesAndCharacteristics();
       await new Promise((r) => setTimeout(r, 600));
@@ -122,7 +130,7 @@ export function useBLE() {
             return;
           }
           handleData(char);
-        },
+        }
       );
       monitorRef.current = monitor;
     } catch (err) {
@@ -135,8 +143,10 @@ export function useBLE() {
   startScanRef.current = () => {
     if (scanRef.current) return;
     scanRef.current = true;
-    console.log("Escaneando...");
     const manager = managerRef.current;
+    // Usa el nombre BLE de la config
+    const deviceName = configRef.current.bleDeviceName;
+    console.log("Escaneando por:", deviceName);
 
     setTimeout(() => {
       manager.startDeviceScan(
@@ -148,15 +158,12 @@ export function useBLE() {
             scanRef.current = false;
             return;
           }
-          if (device?.name) {
-            console.log("Dispositivo encontrado:", device.name, device.id);
-          }
-          if (device?.name === BLE_DEVICE_NAME) {
+          if (device?.name === deviceName) {
             manager.stopDeviceScan();
             scanRef.current = false;
             connectDevice(device);
           }
-        },
+        }
       );
     }, 1000);
   };

@@ -10,6 +10,7 @@
     "eject": "expo eject"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
     "base-64": "^1.0.0",
     "buffer": "^6.0.3",
     "expo": "~56.0.8",
