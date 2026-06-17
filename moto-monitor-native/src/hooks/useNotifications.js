@@ -1,12 +1,13 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// useNotifications.js — Notificaciones push de alertas
+// useNotifications.js — Alertas push + notificación persistente de voltaje
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 
-// Configurar cómo se muestran las notificaciones cuando la app está abierta
+const PERSISTENT_ID = 'moto-monitor-persistent';
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -26,11 +27,36 @@ async function requestPermissions() {
 async function sendAlert(title, body) {
   await Notifications.scheduleNotificationAsync({
     content: { title, body, sound: true },
-    trigger: null, // inmediata
+    trigger: null,
   });
 }
 
-export function useNotifications(alerts) {
+async function updatePersistentNotification(voltage, current, connected) {
+  // Cancela la anterior
+  await Notifications.dismissNotificationAsync(PERSISTENT_ID).catch(() => {});
+
+  const title = connected
+    ? `🏍️ ${voltage?.toFixed(2) ?? '--'} V · ${current?.toFixed(2) ?? '--'} A`
+    : '🏍️ Monitor de Batería';
+
+  const body = connected
+    ? `Batería monitoreada · Toca para abrir`
+    : 'Buscando dispositivo BLE...';
+
+  await Notifications.scheduleNotificationAsync({
+    identifier: PERSISTENT_ID,
+    content: {
+      title,
+      body,
+      sticky: true,    // ← no se descarta con swipe
+      ongoing: true,   // ← siempre visible
+      sound: false,    // ← sin sonido para la persistente
+    },
+    trigger: null,
+  });
+}
+
+export function useNotifications(alerts, voltage, current, connected) {
   const prevAlertsRef = useRef([]);
   const permissionRef = useRef(false);
 
@@ -38,11 +64,21 @@ export function useNotifications(alerts) {
   useEffect(() => {
     requestPermissions().then((ok) => {
       permissionRef.current = ok;
-      if (!ok) console.warn('Permisos de notificación denegados');
     });
+
+    // Limpiar notificación persistente al desmontar
+    return () => {
+      Notifications.dismissNotificationAsync(PERSISTENT_ID).catch(() => {});
+    };
   }, []);
 
-  // Detectar alertas nuevas y notificar
+  // Actualizar notificación persistente cuando cambian voltage/current
+  useEffect(() => {
+    if (!permissionRef.current) return;
+    updatePersistentNotification(voltage, current, connected);
+  }, [voltage, current, connected]);
+
+  // Detectar alertas nuevas
   useEffect(() => {
     if (!permissionRef.current) return;
     if (!alerts || alerts.length === 0) {
@@ -50,7 +86,6 @@ export function useNotifications(alerts) {
       return;
     }
 
-    // Solo notificar alertas que no existían antes
     const prevMsgs = prevAlertsRef.current.map((a) => a.msg);
     const nuevas   = alerts.filter((a) => !prevMsgs.includes(a.msg));
 

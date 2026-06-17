@@ -39,7 +39,7 @@ export default function HomeScreen() {
   const { connected, voltage, current, power, batteryPct, history, alerts } =
     useBLE(config);
 
-  useNotifications(alerts);
+  useNotifications(alerts, voltage, current, connected);
   const { health, sesiones, saveSession } = useBatteryHealth(voltage);
 
   useEffect(() => {
