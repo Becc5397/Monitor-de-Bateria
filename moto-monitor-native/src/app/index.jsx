@@ -2,39 +2,45 @@
 // app/index.jsx — Pantalla principal con wizard de primera conexión
 // ═══════════════════════════════════════════════════════════════════════════════
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
-  View, Text, ScrollView, StyleSheet,
-  StatusBar, RefreshControl, TouchableOpacity,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  StatusBar,
+  RefreshControl,
+  TouchableOpacity,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 
-import { useBLE }            from '../hooks/useBLE';
-import { useConfig }         from '../hooks/useConfig';
-import { useFirstLaunch }    from '../hooks/useFirstLaunch';
-import WizardScreen          from '../components/WizardScreen';
-import GaugeCard             from '../components/GaugeCard';
-import PowerCard             from '../components/PowerCard';
-import AlertPanel            from '../components/AlertPanel';
-import RealtimeChart         from '../components/RealtimeChart';
-import ConnectionStatus      from '../components/ConnectionStatus';
-import { useNotifications } from '../hooks/useNotifications';
+import { useBLE } from "../hooks/useBLE";
+import { useConfig } from "../hooks/useConfig";
+import { useFirstLaunch } from "../hooks/useFirstLaunch";
+import WizardScreen from "../components/WizardScreen";
+import GaugeCard from "../components/GaugeCard";
+import PowerCard from "../components/PowerCard";
+import AlertPanel from "../components/AlertPanel";
+import RealtimeChart from "../components/RealtimeChart";
+import ConnectionStatus from "../components/ConnectionStatus";
+import { useNotifications } from "../hooks/useNotifications";
+import { useBatteryHealth } from "../hooks/useBatteryHealth";
+import BatteryHealthCard from "../components/BatteryHealthCard";
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { config, loading }             = useConfig();
+  const { config, loading } = useConfig();
   const { isFirstLaunch, completeFirstLaunch } = useFirstLaunch();
 
   const [sampleCount, setSampleCount] = useState(0);
-  const [refreshing,  setRefreshing]  = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const {
-    connected, voltage, current,
-    power, batteryPct, history, alerts,
-  } = useBLE(config);
+  const { connected, voltage, current, power, batteryPct, history, alerts } =
+    useBLE(config);
 
   useNotifications(alerts);
+  const { health, sesiones, saveSession } = useBatteryHealth(voltage);
 
   useEffect(() => {
     if (history.length > 0) setSampleCount(history.length);
@@ -50,8 +56,10 @@ export default function HomeScreen() {
   if (loading || isFirstLaunch === null) {
     return (
       <SafeAreaView style={styles.safe}>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#8E8E93', fontSize: 14 }}>Cargando...</Text>
+        <View
+          style={{ flex: 1, alignItems: "center", justifyContent: "center" }}
+        >
+          <Text style={{ color: "#8E8E93", fontSize: 14 }}>Cargando...</Text>
         </View>
       </SafeAreaView>
     );
@@ -75,7 +83,7 @@ export default function HomeScreen() {
           <ConnectionStatus connected={connected} simulate={false} />
           <TouchableOpacity
             style={styles.configBtn}
-            onPress={() => router.push('/config')}
+            onPress={() => router.push("/config")}
           >
             <Text style={styles.configIcon}>⚙️</Text>
           </TouchableOpacity>
@@ -126,13 +134,15 @@ export default function HomeScreen() {
           />
         </View>
 
+        {/* ── Salud de batería ← AGREGA ESTA SECCIÓN ───────────────── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>salud de batería</Text>
+          <BatteryHealthCard health={health} sesiones={sesiones} />
+        </View>
+
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>historial</Text>
-          <RealtimeChart
-            history={history}
-            showVoltage
-            showCurrent
-          />
+          <RealtimeChart history={history} showVoltage showCurrent />
         </View>
 
         {alerts.length === 0 && (
@@ -144,7 +154,7 @@ export default function HomeScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            datos por BLE · {connected ? 'conectado' : 'buscando...'}
+            datos por BLE · {connected ? "conectado" : "buscando..."}
           </Text>
         </View>
       </ScrollView>
@@ -153,18 +163,46 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe:         { flex: 1, backgroundColor: '#F2F2F7' },
-  header:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 14, backgroundColor: '#F2F2F7' },
-  headerTitle:  { fontSize: 18, fontWeight: '600', color: '#1C1C1E', letterSpacing: -0.3 },
-  headerSub:    { fontSize: 12, color: '#8E8E93', marginTop: 2 },
-  headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  configBtn:    { width: 36, height: 36, borderRadius: 99, backgroundColor: '#FFFFFF', borderWidth: 0.5, borderColor: '#E5E5E5', alignItems: 'center', justifyContent: 'center' },
-  configIcon:   { fontSize: 18 },
-  scroll:       { flex: 1 },
-  content:      { paddingHorizontal: 16, paddingBottom: 32, gap: 8 },
-  section:      { gap: 8 },
-  sectionLabel: { fontSize: 11, fontWeight: '600', color: '#8E8E93', letterSpacing: 0.8, textTransform: 'uppercase', paddingHorizontal: 4 },
-  gaugeRow:     { flexDirection: 'row', gap: 10 },
-  footer:       { alignItems: 'center', paddingTop: 8 },
-  footerText:   { fontSize: 11, color: '#AEAEB2' },
+  safe: { flex: 1, backgroundColor: "#F2F2F7" },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    backgroundColor: "#F2F2F7",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1C1C1E",
+    letterSpacing: -0.3,
+  },
+  headerSub: { fontSize: 12, color: "#8E8E93", marginTop: 2 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 10 },
+  configBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 99,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 0.5,
+    borderColor: "#E5E5E5",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  configIcon: { fontSize: 18 },
+  scroll: { flex: 1 },
+  content: { paddingHorizontal: 16, paddingBottom: 32, gap: 8 },
+  section: { gap: 8 },
+  sectionLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#8E8E93",
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+    paddingHorizontal: 4,
+  },
+  gaugeRow: { flexDirection: "row", gap: 10 },
+  footer: { alignItems: "center", paddingTop: 8 },
+  footerText: { fontSize: 11, color: "#AEAEB2" },
 });
