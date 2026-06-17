@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════════
-// app/index.jsx — Pantalla principal del monitor de motocicleta (BLE)
+// app/index.jsx — Pantalla principal con wizard de primera conexión
 // ═══════════════════════════════════════════════════════════════════════════════
 
 import { useState, useEffect } from 'react';
@@ -12,6 +12,8 @@ import { useRouter } from 'expo-router';
 
 import { useBLE }            from '../hooks/useBLE';
 import { useConfig }         from '../hooks/useConfig';
+import { useFirstLaunch }    from '../hooks/useFirstLaunch';
+import WizardScreen          from '../components/WizardScreen';
 import GaugeCard             from '../components/GaugeCard';
 import PowerCard             from '../components/PowerCard';
 import AlertPanel            from '../components/AlertPanel';
@@ -20,12 +22,12 @@ import ConnectionStatus      from '../components/ConnectionStatus';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { config, loading } = useConfig();
+  const { config, loading }             = useConfig();
+  const { isFirstLaunch, completeFirstLaunch } = useFirstLaunch();
 
   const [sampleCount, setSampleCount] = useState(0);
   const [refreshing,  setRefreshing]  = useState(false);
 
-  // Pasa config a useBLE — ahora usa los valores guardados
   const {
     connected, voltage, current,
     power, batteryPct, history, alerts,
@@ -41,22 +43,26 @@ export default function HomeScreen() {
     setTimeout(() => setRefreshing(false), 800);
   };
 
-  // Espera a que cargue la config antes de renderizar
-  if (loading) {
+  // Cargando config o estado de primer lanzamiento
+  if (loading || isFirstLaunch === null) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ color: '#8E8E93', fontSize: 14 }}>Cargando configuración...</Text>
+          <Text style={{ color: '#8E8E93', fontSize: 14 }}>Cargando...</Text>
         </View>
       </SafeAreaView>
     );
+  }
+
+  // Primera vez — mostrar wizard
+  if (isFirstLaunch) {
+    return <WizardScreen onComplete={completeFirstLaunch} />;
   }
 
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor="#F2F2F7" />
 
-      {/* ── Header ────────────────────────────────────────────────────── */}
       <View style={styles.header}>
         <View>
           <Text style={styles.headerTitle}>🏍️ {config.vehicleName}</Text>
@@ -64,7 +70,6 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerRight}>
           <ConnectionStatus connected={connected} simulate={false} />
-          {/* Botón configuración */}
           <TouchableOpacity
             style={styles.configBtn}
             onPress={() => router.push('/config')}
