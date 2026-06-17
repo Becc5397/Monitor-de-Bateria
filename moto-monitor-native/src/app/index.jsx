@@ -19,6 +19,7 @@ import PowerCard             from '../components/PowerCard';
 import AlertPanel            from '../components/AlertPanel';
 import RealtimeChart         from '../components/RealtimeChart';
 import ConnectionStatus      from '../components/ConnectionStatus';
+import { useNotifications } from '../hooks/useNotifications';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -32,6 +33,8 @@ export default function HomeScreen() {
     connected, voltage, current,
     power, batteryPct, history, alerts,
   } = useBLE(config);
+
+  useNotifications(alerts);
 
   useEffect(() => {
     if (history.length > 0) setSampleCount(history.length);
