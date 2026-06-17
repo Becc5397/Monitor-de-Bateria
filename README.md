@@ -1,34 +1,41 @@
 # 🏍️ Monitor de Batería — Apache 160 4v
 
-Monitor en tiempo real del sistema eléctrico de la TVS Apache 160 4v mediante BLE (Bluetooth Low Energy). El ESP32 lee voltaje y corriente, los envía por BLE y la app React Native los muestra en gauges, métricas y gráfica histórica.
+Monitor en tiempo real del sistema eléctrico de motocicletas mediante BLE (Bluetooth Low Energy). Un ESP32 lee voltaje y corriente, los envía por BLE y la app React Native los muestra en gauges, métricas, gráfica histórica y notificaciones en tiempo real.
 
 ---
 
-## 📱 Características
+## 📱 Capturas de pantalla
 
-- Conexión BLE automática al encender la moto
-- Lectura de voltaje (divisor resistivo) y corriente (ACS712-30A)
-- Gauge de voltaje y corriente en tiempo real
-- Gráfica histórica de los últimos 60 puntos (~30 segundos)
-- Alertas de voltaje crítico, sobrevoltaje y sobrecorriente
-- Porcentaje de batería calculado por curva de descarga real
-- Reconexión automática si se pierde la señal BLE
-- APK instalable generado con EAS Build
+<p align="center">
+  <img src="docs/screenshot-gauges.png" width="220"/>
+  <img src="docs/screenshot-chart.png" width="220"/>
+  <img src="docs/screenshot-health.png" width="220"/>
+</p>
 
 ---
 
-## 📸 Screenshots
+## ✅ Funcionalidades
 
-<p align="center">
-  <img src="docs/gauges.jpeg" width="250"/>
-  <img src="docs/charts.jpeg" width="250"/>
-</p>
+### App móvil
+- 📡 Conexión BLE automática y reconexión sin intervención del usuario
+- ⚡ Gauges de voltaje y corriente en tiempo real
+- 📊 Gráfica histórica de los últimos 60 puntos (~30 segundos)
+- 🔔 Alertas de voltaje crítico, sobrevoltaje, sobrecorriente y batería baja
+- 🔋 Porcentaje de batería calculado por curva de descarga real
+- 💡 Potencia calculada en tiempo real (V × A)
+- 🧠 Salud de batería — historial de sesiones, tendencia y recomendación
+- 🔔 Notificaciones push de alertas aunque la app esté en segundo plano
+- 📌 Notificación persistente con voltaje y corriente siempre visible
+- ⚙️ Configuración universal sin recompilar la APK
+- 🧙 Wizard de primera conexión — guía paso a paso para nuevos usuarios
 
-## 🔧 Hardware
-
-<p align="center">
-  <img src="docs/hardware.jpeg" width="500"/>
-</p>
+### Configuración universal (sin recompilar)
+Desde la pantalla de configuración el usuario puede cambiar:
+- Nombre del dispositivo BLE
+- Nombre del vehículo
+- Voltaje mínimo, máximo y alerta de batería baja
+- Corriente máxima y alerta de corriente alta
+- Tipo de batería (plomo-ácido o litio)
 
 ---
 
@@ -36,14 +43,29 @@ Monitor en tiempo real del sistema eléctrico de la TVS Apache 160 4v mediante B
 
 ```
 Monitor-de-Bateria/
-├── moto-monitor-native/    # App React Native (Expo)
+├── moto-monitor-native/          # App React Native (Expo)
 │   ├── src/
-│   │   ├── app/            # Pantalla principal (Expo Router)
-│   │   ├── components/     # GaugeCard, RealtimeChart, AlertPanel...
-│   │   ├── hooks/          # useBLE.js
-│   │   └── utils/          # batteryPercent.js
+│   │   ├── app/
+│   │   │   ├── index.jsx         # Pantalla principal
+│   │   │   └── config.jsx        # Pantalla de configuración
+│   │   ├── components/
+│   │   │   ├── GaugeCard.jsx
+│   │   │   ├── RealtimeChart.jsx
+│   │   │   ├── AlertPanel.jsx
+│   │   │   ├── PowerCard.jsx
+│   │   │   ├── ConnectionStatus.jsx
+│   │   │   ├── BatteryHealthCard.jsx
+│   │   │   └── WizardScreen.jsx
+│   │   ├── hooks/
+│   │   │   ├── useBLE.js
+│   │   │   ├── useConfig.js
+│   │   │   ├── useFirstLaunch.js
+│   │   │   ├── useNotifications.js
+│   │   │   └── useBatteryHealth.js
+│   │   └── utils/
+│   │       └── batteryPercent.js
 │   └── app.json
-└── moto-monitor-ble/       # Firmware ESP32 (Arduino IDE)
+└── moto-monitor-ble/             # Firmware ESP32 (Arduino IDE)
     ├── moto_monitor_ble.ino
     └── config.h
 ```
@@ -54,12 +76,14 @@ Monitor-de-Bateria/
 
 | Componente | Descripción |
 |---|---|
-| ESP32 (cualquier variante) | Microcontrolador con BLE |
+| ESP32 (cualquier variante) | Microcontrolador con BLE integrado |
 | ACS712-30A | Sensor de corriente por efecto Hall |
 | LM2596 | Regulador step-down 5V para alimentar el ACS712 |
 | Resistor 27kΩ × 2 | R1 del divisor de voltaje (en serie = 54kΩ) |
 | Resistor 10kΩ | R2 del divisor de voltaje |
 | Cables y protoboard | Conexiones |
+
+> ⚠️ El sellado del módulo contra humedad (lluvia y lavados) está en proceso de resolución para instalación definitiva en la moto.
 
 ---
 
@@ -79,7 +103,7 @@ Batería 12V ──┬──── R1 (27kΩ + 27kΩ) ──── R2 (10kΩ) �
 - `GPIO34` — Voltaje (divisor resistivo)
 - `GPIO35` — Corriente (ACS712 VOUT)
 
-**Calibración:**
+**Calibración por defecto:**
 - `FACTOR_VOLTAJE = 6.4`
 - `OFFSET_VOLTAJE = 1.00` (ajustado con multímetro)
 - `ACS712_SENSIBILIDAD = 0.066 V/A` (modelo 30A)
@@ -96,7 +120,7 @@ Batería 12V ──┬──── R1 (27kΩ + 27kΩ) ──── R2 (10kΩ) �
 
 ### Pasos
 1. Abre `moto-monitor-ble/moto_monitor_ble.ino` en Arduino IDE
-2. Revisa `config.h` y ajusta los pines y calibración si es necesario
+2. Revisa `config.h` y ajusta pines, nombre BLE y calibración si es necesario
 3. Selecciona tu placa ESP32 en `Tools → Board`
 4. Conecta el ESP32 por USB y selecciona el puerto
 5. Sube el sketch (`Ctrl+U`)
@@ -138,7 +162,9 @@ Los UUIDs deben coincidir exactamente entre el ESP32 y la app:
 |---|---|
 | `SERVICE_UUID` | `12345678-1234-1234-1234-123456789abc` |
 | `CHAR_UUID` | `abcd1234-ab12-ab12-ab12-abcdef123456` |
-| Nombre dispositivo | `MotoMonitor` |
+| Nombre dispositivo | Configurable desde la app (por defecto `MotoMonitor`) |
+
+Para usar la app en múltiples motos, cada ESP32 debe tener un nombre BLE diferente en `config.h` y el usuario lo configura desde la pantalla de ajustes sin recompilar.
 
 ---
 
@@ -148,19 +174,36 @@ Los UUIDs deben coincidir exactamente entre el ESP32 y la app:
 - React Native + Expo (Expo Router)
 - `react-native-ble-plx` — comunicación BLE
 - `react-native-svg` — gráfica personalizada
+- `@react-native-async-storage/async-storage` — persistencia local
+- `expo-notifications` — notificaciones push y persistente
+- `expo-device` — detección de dispositivo físico
 - `base-64` — decodificación de paquetes BLE
 - EAS Build — generación del APK
 
 **Firmware:**
 - ESP32 + Arduino IDE
-- `BLEDevice` / `BLEServer` / `BLE2902` — servidor BLE
-- JSON compacto `{"v":12.6,"i":3.2}` dentro del límite de 20 bytes BLE
+- `BLEDevice` / `BLEServer` / `BLE2902` — servidor BLE nativo
+- JSON compacto `{"v":12.6,"i":3.2}` dentro del límite BLE
+
+---
+
+## 🔋 Salud de batería
+
+La app acumula el voltaje máximo alcanzado en cada sesión de uso. Con un mínimo de 3 sesiones calcula:
+
+- **Porcentaje de salud** — comparando el voltaje máximo real vs el esperado en batería nueva (12.7V)
+- **Tendencia** — estable, bajando o mejorando comparando las últimas sesiones
+- **Ciclos estimados restantes** — basado en la vida útil de referencia de 400 ciclos
+- **Recomendación** — buen estado, revisión pronto, o reemplazo próximo
 
 ---
 
 ## 👤 Autor
 
-**Boris (Boricuas)** — Técnico en electrónica marina, y estudiante de desarrollo de software, Cartagena, Colombia.
+**Boris Hernández (Boricuas)** — Técnico en electrónica marina, TMR Yacht, Cartagena, Colombia.
+En transición hacia el desarrollo de software.
+
+🔗 [GitHub](https://github.com/Becc5397) · [LinkedIn](https://www.linkedin.com/in/boris-hernández)
 
 ---
 
